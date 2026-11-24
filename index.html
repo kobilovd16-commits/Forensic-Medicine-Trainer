@@ -1294,6 +1294,16 @@ function selectOption(optIdx) {
 
   sessionAnswers[currentIndex] = { chosenIdx: optIdx, isCorrect };
   if (!assessmentMode) recordQuestionProgress(item.uid, isCorrect);
+  // Учебный режим: ошибка возвращается через несколько вопросов, максимум три раза подряд.
+  if (!assessmentMode && !isCorrect) {
+    const repeatCount = (item._repeatCount || 0) + 1;
+    if (repeatCount <= 3) {
+      const repeatItem = Object.assign({}, item, {_repeatCount: repeatCount});
+      const repeatAt = Math.min(currentIndex + 3, sessionQuestions.length);
+      sessionQuestions.splice(repeatAt, 0, repeatItem);
+      buildNavDots();
+    }
+  }
   saveActiveSession();
   renderQuestion();
 }
