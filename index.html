@@ -6,6 +6,30 @@
 <title>СМЭ Тренажёр — Сохранение прогресса</title>
 <style>
   :root {
+    --bg: #f6f4ef;
+    --bg-card: #ffffff;
+    --bg-elevated: #eeece5;
+    --border: #dedbd1;
+    --text: #263238;
+    --text-muted: #697579;
+    --primary: #287c78;
+    --primary-hover: #1f6663;
+    --primary-soft: rgba(40, 124, 120, 0.11);
+    --green: #39856b;
+    --green-bg: rgba(57, 133, 107, 0.12);
+    --green-border: #39856b;
+    --red: #c45c55;
+    --red-bg: rgba(196, 92, 85, 0.12);
+    --red-border: #c45c55;
+    --amber: #b98235;
+    --amber-bg: rgba(185, 130, 53, 0.12);
+    --purple: #8171a8;
+    --purple-bg: rgba(129, 113, 168, 0.11);
+    --radius: 16px;
+    --shadow: 0 8px 22px -6px rgba(55, 65, 60, 0.10);
+  }
+
+  body:not(.light) {
     --bg: #0f172a;
     --bg-card: #1e293b;
     --bg-elevated: #0b1120;
@@ -25,31 +49,30 @@
     --amber-bg: rgba(245, 158, 11, 0.14);
     --purple: #a78bfa;
     --purple-bg: rgba(139, 92, 246, 0.14);
-    --radius: 14px;
     --shadow: 0 10px 25px -5px rgba(0,0,0,0.45);
   }
 
   body.light {
-    --bg: #f1f5f9;
+    --bg: #f6f4ef;
     --bg-card: #ffffff;
-    --bg-elevated: #e2e8f0;
-    --border: #cbd5e1;
-    --text: #0f172a;
-    --text-muted: #475569;
-    --primary: #2563eb;
-    --primary-hover: #1d4ed8;
-    --primary-soft: rgba(37, 99, 235, 0.1);
-    --green: #059669;
-    --green-bg: rgba(16, 185, 129, 0.14);
-    --green-border: #059669;
-    --red: #dc2626;
-    --red-bg: rgba(239, 68, 68, 0.13);
-    --red-border: #dc2626;
-    --amber: #d97706;
-    --amber-bg: rgba(245, 158, 11, 0.12);
-    --purple: #7c3aed;
-    --purple-bg: rgba(124, 58, 237, 0.1);
-    --shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.08);
+    --bg-elevated: #eeece5;
+    --border: #dedbd1;
+    --text: #263238;
+    --text-muted: #697579;
+    --primary: #287c78;
+    --primary-hover: #1f6663;
+    --primary-soft: rgba(40, 124, 120, 0.11);
+    --green: #39856b;
+    --green-bg: rgba(57, 133, 107, 0.12);
+    --green-border: #39856b;
+    --red: #c45c55;
+    --red-bg: rgba(196, 92, 85, 0.12);
+    --red-border: #c45c55;
+    --amber: #b98235;
+    --amber-bg: rgba(185, 130, 53, 0.12);
+    --purple: #8171a8;
+    --purple-bg: rgba(129, 113, 168, 0.11);
+    --shadow: 0 8px 22px -6px rgba(55, 65, 60, 0.10);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -91,7 +114,7 @@
     width: 38px;
     height: 38px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #2563eb, #0ea5e9);
+    background: linear-gradient(135deg, #287c78, #d18b69);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -155,7 +178,7 @@
 
   /* Exam Banner */
   .exam-banner {
-    background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%);
+    background: linear-gradient(125deg, #287c78 0%, #5b8d84 55%, #d18b69 100%);
     border: 1px solid #3b82f6;
     border-radius: var(--radius);
     padding: 18px 20px;
@@ -163,7 +186,7 @@
     color: #fff;
     box-shadow: var(--shadow);
   }
-  body.light .exam-banner { background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%); }
+  body.light .exam-banner { background: linear-gradient(125deg, #287c78 0%, #5b8d84 55%, #d18b69 100%); }
   .exam-banner h1 { margin: 0 0 5px 0; font-size: 18.5px; font-weight: 800; }
   .exam-banner p { margin: 0 0 12px 0; font-size: 13px; color: #dbeafe; }
   .exam-controls { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -873,10 +896,10 @@ function updateGlobalDashboard() {
 
 // Theme
 function initTheme() {
-  if (storageGet(KEY_THEME) === 'light') {
-    document.body.classList.add('light');
-    document.getElementById('themeBtn').textContent = 'Тёмная';
-  }
+  const savedTheme = storageGet(KEY_THEME);
+  const useLight = savedTheme !== 'dark';
+  document.body.classList.toggle('light', useLight);
+  document.getElementById('themeBtn').textContent = useLight ? 'Тёмная' : 'Светлая';
 }
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
