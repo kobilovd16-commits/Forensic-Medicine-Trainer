@@ -1,0 +1,12 @@
+{
+  "name": "СМЭ Тренажёр — Судебная медицина",
+  "short_name": "СМЭ Тренажёр",
+  "description": "Изучение и тестирование по судебной медицине",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7fbfb",
+  "theme_color": "#0f8b8d",
+  "icons": []
+}
