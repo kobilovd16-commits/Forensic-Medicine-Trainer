@@ -865,7 +865,7 @@ function getTopicNumberFromQuestion(item) {
   if (item && item.topic) return Number(item.topic);
   const source=String((item&&item.s)||'');
   for(let n=1;n<=9;n++) if(source.includes(TOPIC_TITLES[n])) return n;
-  const m=source.match(/(?:тема|topic)\\s*(\\d+)/i);
+  const m=source.match(/(?:тема|topic)\s*(\d+)/i);
   return m ? Number(m[1]) : null;
 }
 function saveTopicScoreFromSession() {
