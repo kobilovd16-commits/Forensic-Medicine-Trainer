@@ -449,6 +449,42 @@
   .review-q { font-weight: 700; margin-bottom: 6px; font-size: 14px; }
   .review-ans-bad { color: var(--red); font-size: 13px; margin-bottom: 3px; }
   .review-ans-good { color: var(--green); font-size: 13px; font-weight: 600; }
+
+  /* 2026 redesign: white, circular progress, mobile-first */
+  :root{--bg:#f7fbfb;--bg-card:#fff;--bg-elevated:#f1f7f7;--border:#dcebea;--text:#183233;--text-muted:#6b8080;--primary:#0f8b8d;--primary-hover:#0b6f71;--primary-soft:rgba(15,139,141,.10);--green:#22a06b;--green-bg:rgba(34,160,107,.12);--red:#d95c63;--red-bg:rgba(217,92,99,.12);--amber:#d69431;--amber-bg:rgba(214,148,49,.14);--purple:#7464c4;--purple-bg:rgba(116,100,196,.12);--radius:20px;--shadow:0 12px 30px rgba(24,50,51,.07)}
+  body,body.light{background:linear-gradient(180deg,#fff 0%,#f7fbfb 100%);color:var(--text)}
+  body:not(.light){background:linear-gradient(180deg,#fff 0%,#f7fbfb 100%);color:var(--text)}
+  .container{max-width:1100px;padding:18px}
+  .topbar{border:none;border-radius:24px;padding:14px 18px;box-shadow:0 8px 24px rgba(15,139,141,.08)}
+  .brand-badge{border-radius:14px;background:linear-gradient(135deg,#0f8b8d,#5bc5b7);width:44px;height:44px}
+  .icon-btn{background:#f6fbfb;border-color:#dcebea;border-radius:12px}
+  .global-stats{grid-template-columns:repeat(4,1fr)}
+  .stat-box{border:none;border-radius:18px;box-shadow:var(--shadow);padding:16px}
+  .exam-banner{background:linear-gradient(135deg,#0f8b8d,#47b7a8);border:none;border-radius:24px}
+  .topic-section,.q-card,.quiz-header,.result-card{border:none;box-shadow:var(--shadow)}
+  .topic-progress-bar,.progress-track{display:none}
+  .topic-section{padding:20px}
+  .sub-deck{background:#f8fcfc;border:none;border-radius:16px}
+  .opt-btn{background:#fbfefe;border-color:#dcebea;border-radius:15px;padding:14px}
+  .opt-btn:hover:not(.locked){background:#effafa}
+  .nav-dots{background:#fff;border:none;box-shadow:var(--shadow);border-radius:16px}
+  .dot{border-radius:50%;width:30px;height:30px}
+  .btn-start,.btn-next,.btn-hero{border-radius:12px}
+  .circle-dashboard{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:14px;margin:0 0 16px}
+  .circle-card{background:#fff;border:1px solid #e4f0ef;border-radius:22px;padding:18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px}
+  .circle-card.main{grid-row:span 2}
+  .circle{--pct:0%;width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--primary) var(--pct),#e7f1f0 0);position:relative;flex:0 0 auto}
+  .circle:after{content:"";position:absolute;inset:9px;background:#fff;border-radius:50%}
+  .circle span{position:relative;z-index:1;font-size:20px;font-weight:900;color:var(--text)}
+  .circle.small{width:68px;height:68px}.circle.small:after{inset:7px}.circle.small span{font-size:15px}
+  .dashboard-title{font-weight:800;font-size:14px}.dashboard-sub{font-size:12px;color:var(--text-muted);margin-top:3px}
+  .achievement-strip{background:#fff;border:1px solid #e4f0ef;border-radius:22px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+  .achievement-list{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .achievement{padding:8px 11px;border-radius:12px;background:#f4f9f9;font-size:12px;font-weight:700;color:#789090}
+  .achievement.unlocked{background:#e8f8f0;color:#168258}
+  @media(max-width:760px){.global-stats{grid-template-columns:repeat(2,1fr)}.circle-dashboard{grid-template-columns:1fr 1fr}.circle-card.main{grid-column:1/-1;grid-row:auto}.container{padding:12px}.topbar{border-radius:18px}.top-actions{width:100%}.icon-btn{flex:1}.exam-controls button{flex:1 1 100%}}
+  @media(max-width:480px){.circle-dashboard{grid-template-columns:1fr}.circle-card.main{grid-column:auto}.global-stats{gap:8px}.stat-box{padding:12px}.stat-val{font-size:18px}}
+
 </style>
 </head>
 <body>
@@ -492,6 +528,21 @@
       </div>
     </section>
 
+    
+    <section class="circle-dashboard" aria-label="Круговой прогресс">
+      <div class="circle-card main">
+        <div class="circle" id="overallCircle" style="--pct:0%"><span id="overallPct">0%</span></div>
+        <div><div class="dashboard-title">Общий прогресс</div><div class="dashboard-sub" id="overallLabel">Начните изучение тем</div><button class="btn-start" style="margin-top:10px" onclick="startStudyAll()">Продолжить обучение</button></div>
+      </div>
+      <div class="circle-card"><div class="circle small" id="accuracyCircle" style="--pct:0%"><span id="accuracyPct">0%</span></div><div><div class="dashboard-title">Точность</div><div class="dashboard-sub">по решённым вопросам</div></div></div>
+      <div class="circle-card"><div class="circle small" id="gradeCircle" style="--pct:0%"><span id="gradePct">—</span></div><div><div class="dashboard-title">Оценка</div><div class="dashboard-sub" id="gradeLabel">Пока нет тестов</div></div></div>
+      <div class="circle-card"><div class="circle small" id="mistakeCircle" style="--pct:0%"><span id="mistakePct">0</span></div><div><div class="dashboard-title">Повторить ошибки</div><div class="dashboard-sub">вопросов ждут вас</div></div></div>
+    </section>
+    <section class="achievement-strip">
+      <div class="dashboard-title">Достижения</div>
+      <div class="achievement-list" id="achievementList"></div>
+    </section>
+
     <!-- RESUME INCOMPLETE SESSION -->
     <section id="resumeBox" class="resume-box hidden">
       <div>
@@ -518,6 +569,7 @@
         <div class="exam-controls">
           <button class="btn-hero" onclick="startDeanTest(50, true)">50 вопросов • 25 минут</button>
           <button class="btn-hero-sec" onclick="startDeanTest(100, true)">100 вопросов • 25 минут</button>
+          <button class="btn-hero-sec" onclick="startDeanTest(25, true)">25 вопросов • 25 минут</button>
         </div>
       </div>
     </section>
@@ -764,17 +816,46 @@ function getProgressMap() {
   try { return JSON.parse(storageGet(KEY_PROGRESS) || '{}'); }
   catch (e) { return {}; }
 }
+const KEY_LAST_GRADE = 'sme_last_grade_v1';
+function gradeForPercent(pct) {
+  if (pct < 60) return {label:'Не сдано', short:'—', color:'#d95c63'};
+  if (pct <= 75) return {label:'Тройка', short:'3', color:'#d69431'};
+  if (pct <= 85) return {label:'Четвёрка', short:'4', color:'#7464c4'};
+  return {label:'Пятёрка', short:'5', color:'#22a06b'};
+}
+function startStudyAll() {
+  const map=getProgressMap();
+  const pool=ALL_QUESTIONS.filter(q=>map[q.uid]!==1);
+  launchSession('Режим изучения • Повторение ошибок', shuffleArray(pool.length?pool:ALL_QUESTIONS));
+}
+function startStudyTopic(tNum) {
+  const pool=ALL_QUESTIONS.filter(q=>q.topic===tNum);
+  launchSession('Изучение темы '+tNum, shuffleArray(pool));
+}
+function updateCircularDashboard() {
+  const map=getProgressMap(), vals=Object.values(map), solved=vals.length, correct=vals.filter(v=>v===1).length, wrong=vals.filter(v=>v===0).length;
+  const overall=Math.round(solved/Math.max(1,ALL_QUESTIONS.length)*100), acc=solved?Math.round(correct/solved*100):0;
+  const set=(id,pct,label)=>{const el=document.getElementById(id);if(el)el.style.setProperty('--pct',pct+'%');const txt=document.getElementById(id.replace('Circle','Pct'));if(txt)txt.textContent=label;};
+  set('overallCircle',overall,overall+'%'); set('accuracyCircle',acc,acc+'%'); set('mistakeCircle',Math.min(100,wrong),String(wrong));
+  const last=storageGet(KEY_LAST_GRADE); let g=null; try{g=last?JSON.parse(last):null}catch(e){}
+  if(g){set('gradeCircle',g.pct,g.grade.short);document.getElementById('gradeLabel').textContent=g.grade.label+' • '+g.pct+'%';document.getElementById('gradeCircle').style.setProperty('--primary',g.grade.color)} 
+  document.getElementById('overallLabel').textContent=solved+' из '+ALL_QUESTIONS.length+' вопросов изучено';
+  const names=[['Первый вопрос',solved>=1],['Проходной балл',acc>=60],['Уверенный студент',acc>=76],['Отличник',acc>=86],['Эксперт',overall>=100]];
+  document.getElementById('achievementList').innerHTML=names.map(a=>'<span class="achievement '+(a[1]?'unlocked':'')+'">'+(a[1]?'✓ ':'🔒 ')+a[0]+'</span>').join('');
+}
 function recordQuestionProgress(uid, isCorrect) {
   const map = getProgressMap();
   map[uid] = isCorrect ? 1 : 0;
   storageSet(KEY_PROGRESS, JSON.stringify(map));
   updateGlobalDashboard();
+  updateCircularDashboard();
 }
 function resetAllProgress() {
   if (!confirm('Сбросить весь сохранённый прогресс по всем 777 вопросам?')) return;
   storageRemove(KEY_PROGRESS);
   storageRemove(KEY_ACTIVE_SESSION);
   updateGlobalDashboard();
+  updateCircularDashboard();
   renderResumeBanner();
   renderTopics();
 }
@@ -998,7 +1079,7 @@ function renderTopics() {
         <div class="sub-deck">
           <div class="sub-deck-top"><span class="badge" style="background:var(--primary-soft);color:var(--primary)">3. Перемешка</span><span class="deck-count">${total} вопр.</span></div>
           <div class="deck-stat">Ситуационные и обычные вперемешку</div>
-          <button class="btn-start" onclick="startTopicMixed(${tNum})">Начать</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-start" onclick="startTopicMixed(${tNum})">Тест</button><button class="btn-unsolved" onclick="startStudyTopic(${tNum})">Учить тему</button></div>
         </div>
       </div>`;
     container.appendChild(section);
@@ -1134,6 +1215,7 @@ function goHome() {
   document.getElementById('resultView').classList.add('hidden');
   document.getElementById('homeView').classList.remove('hidden');
   updateGlobalDashboard();
+  updateCircularDashboard();
   renderResumeBanner();
   renderTopics();
 }
@@ -1257,6 +1339,7 @@ function finishQuiz() {
   });
 
   const pct = Math.round((ok / total) * 100);
+  const grade = gradeForPercent(pct); storageSet(KEY_LAST_GRADE, JSON.stringify({pct, grade}));
   document.getElementById('quizView').classList.add('hidden');
   document.getElementById('resultView').classList.remove('hidden');
 
@@ -1290,6 +1373,7 @@ loadUiPrefs();
 updateGlobalDashboard();
 renderResumeBanner();
 renderTopics();
+updateCircularDashboard();
 </script>
 </body>
 </html>
