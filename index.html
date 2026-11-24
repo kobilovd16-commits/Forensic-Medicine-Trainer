@@ -654,6 +654,7 @@
       <div id="resStats" style="font-weight:700;">Правильно: 0 из 50</div>
       <div class="result-actions">
         <button class="btn-hero" id="retryWrongBtn" onclick="retrySessionMistakes()">Разобрать ошибки сессии</button>
+        <div id="studyRecommendation" class="hidden" style="flex-basis:100%;padding:12px;border-radius:14px;background:var(--amber-bg);color:var(--amber);font-weight:700;text-align:left"></div>
         <button class="btn-next" onclick="restartCurrentMode()">Пройти заново</button>
         <button class="btn-nav" onclick="goHome()">К темам</button>
       </div>
@@ -836,11 +837,11 @@ function gradeForPercent(pct) {
 function startStudyAll() {
   const map=getProgressMap();
   const pool=ALL_QUESTIONS.filter(q=>map[q.uid]!==1);
-  launchSession('Режим изучения • Повторение ошибок', shuffleArray(pool.length?pool:ALL_QUESTIONS));
+  launchSession('Режим изучения • Повторение ошибок', shuffleArray(pool.length?pool:ALL_QUESTIONS), false, false, true);
 }
 function startStudyTopic(tNum) {
   const pool=ALL_QUESTIONS.filter(q=>q.topic===tNum);
-  launchSession('Изучение темы '+tNum, shuffleArray(pool));
+  launchSession('Изучение темы '+tNum, shuffleArray(pool), false, false, true);
 }
 function getTestHistory() {
   try { return JSON.parse(storageGet(KEY_TEST_HISTORY) || '[]'); } catch(e) { return []; }
@@ -971,6 +972,7 @@ function saveActiveSession() {
     currentIndex: currentIndex,
     lastConfig: lastSessionConfig,
     assessmentMode: assessmentMode,
+    studyMode: studyMode,
     timedMode: timedMode,
     sessionDeadline: sessionDeadline
   };
@@ -1007,6 +1009,7 @@ function resumeSavedSession() {
   currentIndex = active.currentIndex || 0;
   lastSessionConfig = active.lastConfig || null;
   assessmentMode = !!active.assessmentMode;
+  studyMode = !!active.studyMode;
   timedMode = !!active.timedMode;
   sessionDeadline = active.sessionDeadline || null;
   timerWarning5Shown = false;
@@ -1075,6 +1078,7 @@ let sessionDeadline = null;
 let timerInterval = null;
 let timerWarning5Shown = false;
 let timerWarning1Shown = false;
+let studyMode = false;
 
 function selectTopicFilter(tNum, btn) {
   selectedTopic = tNum;
@@ -1246,10 +1250,11 @@ function retrySessionMistakes() {
   launchSession(`Ошибки сессии (${wrongPool.length})`, shuffleArray(wrongPool));
 }
 
-function launchSession(title, rawPool, isAssessment = false, withTimer = false) {
+function launchSession(title, rawPool, isAssessment = false, withTimer = false, isStudy = false) {
   stopQuizTimer();
   assessmentMode = !!isAssessment;
   timedMode = !!withTimer;
+  studyMode = !!isStudy;
   sessionDeadline = timedMode ? Date.now() + 25 * 60 * 1000 : null;
   timerWarning5Shown = false;
   timerWarning1Shown = false;
@@ -1359,11 +1364,13 @@ function selectOption(optIdx) {
   sessionAnswers[currentIndex] = { chosenIdx: optIdx, isCorrect };
   if (!assessmentMode) recordQuestionProgress(item.uid, isCorrect);
   // Учебный режим: ошибка возвращается через несколько вопросов, максимум три раза подряд.
-  if (!assessmentMode && !isCorrect) {
+  if (studyMode && !assessmentMode && !isCorrect) {
     const repeatCount = (item._repeatCount || 0) + 1;
     if (repeatCount <= 3) {
       const repeatItem = Object.assign({}, item, {_repeatCount: repeatCount});
-      const repeatAt = Math.min(currentIndex + 3, sessionQuestions.length);
+      const minGap = Math.min(2, Math.max(1, sessionQuestions.length - currentIndex));
+      const maxGap = Math.min(7, Math.max(minGap, sessionQuestions.length - currentIndex));
+      const repeatAt = Math.min(currentIndex + minGap + Math.floor(Math.random() * (maxGap - minGap + 1)), sessionQuestions.length);
       sessionQuestions.splice(repeatAt, 0, repeatItem);
       buildNavDots();
     }
@@ -1427,6 +1434,15 @@ function finishQuiz() {
   document.getElementById('resStats').textContent = `Правильно: ${ok} из ${total} • Ошибок: ${err}`;
 
   document.getElementById('retryWrongBtn').classList.toggle('hidden', wrongItems.length === 0);
+  const topicNumbers=[...new Set(sessionQuestions.map(getTopicNumberFromQuestion).filter(Boolean))];
+  const rec=document.getElementById('studyRecommendation');
+  if(rec) {
+    if(pct<90 && topicNumbers.length===1) {
+      const topic=topicNumbers[0];
+      rec.classList.remove('hidden');
+      rec.innerHTML='Результат ниже 90%. Рекомендуем ещё раз изучить тему или разобрать ошибки. <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px"><button class="btn-start" onclick="startStudyTopic('+topic+')">Учить тему</button><button class="btn-unsolved" onclick="retrySessionMistakes()">Повторить ошибки</button></div>';
+    } else { rec.classList.add('hidden'); rec.innerHTML=''; }
+  }
   const rev = document.getElementById('reviewContainer');
   rev.innerHTML = wrongItems.length === 0
     ? `<div class="review-item" style="text-align:center; color:var(--green); font-weight:700;">Идеально! Ни одной ошибки.</div>`
