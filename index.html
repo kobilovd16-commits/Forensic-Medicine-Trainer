@@ -837,11 +837,11 @@ function gradeForPercent(pct) {
 function startStudyAll() {
   const map=getProgressMap();
   const pool=ALL_QUESTIONS.filter(q=>map[q.uid]!==1);
-  launchSession('Режим изучения • Повторение ошибок', shuffleArray(pool.length?pool:ALL_QUESTIONS), false, false, true);
+  launchSession('Режим изучения • Повторение ошибок', shuffleArray(pool.length?pool:ALL_QUESTIONS), false, false, 'study');
 }
 function startStudyTopic(tNum) {
   const pool=ALL_QUESTIONS.filter(q=>q.topic===tNum);
-  launchSession('Изучение темы '+tNum, shuffleArray(pool), false, false, true);
+  launchSession('Изучение темы '+tNum, shuffleArray(pool), false, false, 'study');
 }
 function getTestHistory() {
   try { return JSON.parse(storageGet(KEY_TEST_HISTORY) || '[]'); } catch(e) { return []; }
@@ -973,6 +973,7 @@ function saveActiveSession() {
     lastConfig: lastSessionConfig,
     assessmentMode: assessmentMode,
     studyMode: studyMode,
+    sessionMode: sessionMode,
     timedMode: timedMode,
     sessionDeadline: sessionDeadline
   };
@@ -1009,7 +1010,8 @@ function resumeSavedSession() {
   currentIndex = active.currentIndex || 0;
   lastSessionConfig = active.lastConfig || null;
   assessmentMode = !!active.assessmentMode;
-  studyMode = !!active.studyMode;
+  sessionMode = active.sessionMode || (active.studyMode ? 'study' : 'test');
+  studyMode = sessionMode === 'study';
   timedMode = !!active.timedMode;
   sessionDeadline = active.sessionDeadline || null;
   timerWarning5Shown = false;
@@ -1079,6 +1081,7 @@ let timerInterval = null;
 let timerWarning5Shown = false;
 let timerWarning1Shown = false;
 let studyMode = false;
+let sessionMode = 'test';
 
 function selectTopicFilter(tNum, btn) {
   selectedTopic = tNum;
@@ -1159,7 +1162,7 @@ function renderTopics() {
 function startTopicMixed(tNum) {
   const pool = ALL_QUESTIONS.filter(item => item.topic === tNum);
   lastSessionConfig = { type: 'topicMixed', tNum };
-  launchSession(`Тема ${tNum} • Перемешка (${pool.length})`, shuffleArray(pool));
+  launchSession(`Тема ${tNum} • Перемешка (${pool.length})`, shuffleArray(pool), false, false, 'test');
 }
 
 function startDeanTest(limit, withTimer) {
@@ -1250,11 +1253,12 @@ function retrySessionMistakes() {
   launchSession(`Ошибки сессии (${wrongPool.length})`, shuffleArray(wrongPool));
 }
 
-function launchSession(title, rawPool, isAssessment = false, withTimer = false, isStudy = false) {
+function launchSession(title, rawPool, isAssessment = false, withTimer = false, mode = 'test') {
   stopQuizTimer();
   assessmentMode = !!isAssessment;
   timedMode = !!withTimer;
-  studyMode = !!isStudy;
+  sessionMode = mode === 'study' ? 'study' : 'test';
+  studyMode = sessionMode === 'study';
   sessionDeadline = timedMode ? Date.now() + 25 * 60 * 1000 : null;
   timerWarning5Shown = false;
   timerWarning1Shown = false;
@@ -1364,7 +1368,7 @@ function selectOption(optIdx) {
   sessionAnswers[currentIndex] = { chosenIdx: optIdx, isCorrect };
   if (!assessmentMode) recordQuestionProgress(item.uid, isCorrect);
   // Учебный режим: ошибка возвращается через несколько вопросов, максимум три раза подряд.
-  if (studyMode && !assessmentMode && !isCorrect) {
+  if (sessionMode === 'study' && !assessmentMode && !isCorrect) {
     const repeatCount = (item._repeatCount || 0) + 1;
     if (repeatCount <= 3) {
       const repeatItem = Object.assign({}, item, {_repeatCount: repeatCount});
