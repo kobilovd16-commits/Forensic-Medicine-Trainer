@@ -1058,11 +1058,13 @@ function resetAllProgress() {
   storageRemove(KEY_ACTIVE_SESSION);
   storageRemove(KEY_TEST_HISTORY);
   storageRemove(KEY_TOPIC_SCORES);
+  storageRemove(KEY_LEVEL_PROGRESS);
   storageRemove(KEY_LAST_GRADE);
   updateGlobalDashboard();
   updateCircularDashboard();
   renderResumeBanner();
   renderTopics();
+  renderFinalLevels();
   renderTestHistory();
 }
 
