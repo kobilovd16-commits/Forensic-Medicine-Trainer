@@ -487,6 +487,21 @@
   @media(max-width:760px){.global-stats{grid-template-columns:repeat(2,1fr)}.circle-dashboard{grid-template-columns:1fr 1fr}.circle-card.main{grid-column:1/-1;grid-row:auto}.container{padding:12px}.topbar{border-radius:18px}.top-actions{width:100%}.icon-btn{flex:1}.exam-controls button{flex:1 1 100%}}
   @media(max-width:480px){.circle-dashboard{grid-template-columns:1fr}.circle-card.main{grid-column:auto}.global-stats{gap:8px}.stat-box{padding:12px}.stat-val{font-size:18px}}
 
+
+  .levels-panel{background:#fff;border:1px solid #e4f0ef;border-radius:22px;padding:20px;box-shadow:var(--shadow);margin-top:16px}
+  .levels-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+  .level-rule{background:var(--green-bg);color:var(--green);padding:7px 10px;border-radius:10px;font-size:12px;font-weight:800;white-space:nowrap}
+  .level-card{border:1px solid #e4f0ef;border-radius:16px;padding:14px;margin-top:10px}
+  .level-card.locked{opacity:.65;background:#f7fafa}
+  .level-card-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .level-title{font-weight:900}.level-status{font-size:12px;color:var(--text-muted);font-weight:700}
+  .level-topics{display:grid;grid-template-columns:repeat(9,1fr);gap:7px;margin-top:12px}
+  .level-topic{border:1px solid #dcebea;background:#f8fcfc;color:var(--text);border-radius:11px;padding:9px 5px;font-size:11px;font-weight:800;cursor:pointer}
+  .level-topic:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .level-topic.done{background:var(--green-bg);border-color:var(--green);color:#168258}
+  .level-topic:disabled{cursor:not-allowed;opacity:.55}
+  @media(max-width:760px){.level-topics{grid-template-columns:repeat(3,1fr)}.levels-heading{flex-direction:column}.level-rule{white-space:normal}}
+
 </style>
 </head>
 <body>
@@ -612,6 +627,17 @@
     </section>
 
     <div class="topics-list" id="topicsContainer"></div>
+
+    <section class="levels-panel">
+      <div class="levels-heading">
+        <div>
+          <div class="dashboard-title">Финальные уровни</div>
+          <div class="dashboard-sub">4 круга повторения: каждый уровень содержит общий тест по всем 9 темам.</div>
+        </div>
+        <span class="level-rule">Проходной балл: 60%</span>
+      </div>
+      <div id="levelsContainer"></div>
+    </section>
   </main>
 
   <!-- QUIZ VIEW -->
@@ -897,6 +923,7 @@ function getProgressMap() {
 const KEY_LAST_GRADE = 'sme_last_grade_v1';
 const KEY_TEST_HISTORY = 'sme_test_history_v1';
 const KEY_TOPIC_SCORES = 'sme_topic_scores_v1';
+const KEY_LEVEL_PROGRESS = 'sme_level_progress_v1';
 function gradeForPercent(pct) {
   if (pct < 60) return {label:'Не сдано', short:'—', color:'#d95c63'};
   if (pct <= 75) return {label:'Тройка', short:'3', color:'#d69431'};
@@ -927,6 +954,49 @@ function renderTestHistory() {
     const d=new Date(h.date).toLocaleDateString('ru-RU');
     return '<div class="history-row"><span>'+d+' • '+escapeHtml(h.title)+'</span><strong>'+h.pct+'% • '+h.grade.label+'</strong></div>';
   }).join('') : '<div class="dashboard-sub">Пройденные тесты появятся здесь</div>';
+}
+function getLevelProgress() {
+  try { return JSON.parse(storageGet(KEY_LEVEL_PROGRESS) || '{}'); } catch(e) { return {}; }
+}
+function levelProgressKey(level, topic) { return level + '_' + topic; }
+function isLevelUnlocked(level) {
+  if (level === 1) return true;
+  const progress = getLevelProgress();
+  for (let topic=1; topic<=9; topic++) {
+    if (!progress[levelProgressKey(level-1, topic)]?.passed) return false;
+  }
+  return true;
+}
+function renderFinalLevels() {
+  const el=document.getElementById('levelsContainer'); if(!el) return;
+  const progress=getLevelProgress();
+  el.innerHTML=Array.from({length:4},(_,idx)=>{
+    const level=idx+1, unlocked=isLevelUnlocked(level);
+    const done=Array.from({length:9},(_,i)=>progress[levelProgressKey(level,i+1)]?.passed).filter(Boolean).length;
+    const cards=Array.from({length:9},(_,i)=>{
+      const topic=i+1, item=progress[levelProgressKey(level,topic)], passed=!!item?.passed;
+      const score=item?.pct==null?'—':item.pct+'%';
+      return '<button class="level-topic '+(passed?'done':'')+'" '+(!unlocked?'disabled':'')+' onclick="startLevelTopicTest('+level+','+topic+')">Тема '+topic+'<br><span>'+score+(passed?' ✓':'')+'</span></button>';
+    }).join('');
+    return '<div class="level-card '+(!unlocked?'locked':'')+'"><div class="level-card-head"><div class="level-title">Уровень '+level+'</div><div class="level-status">'+(unlocked?(done+'/9 тестов пройдено'):'🔒 Сначала завершите уровень '+(level-1))+'</div></div><div class="level-topics">'+cards+'</div></div>';
+  }).join('');
+}
+function startLevelTopicTest(level, topic) {
+  if (!isLevelUnlocked(level)) {
+    alert('Сначала пройдите все 9 тестов предыдущего уровня с результатом не менее 60%.');
+    return;
+  }
+  const pool=ALL_QUESTIONS.filter(item=>item.topic===topic);
+  if(!pool.length){ alert('В этой теме пока нет вопросов.'); return; }
+  lastSessionConfig={type:'levelTopic',level,topic};
+  launchSession('Уровень '+level+' • Итоговый тест темы '+topic+' ('+pool.length+' вопросов)', shuffleArray(pool), false, false, 'test', true);
+}
+function saveLevelResultIfNeeded(pct) {
+  if(!lastSessionConfig || lastSessionConfig.type!=='levelTopic') return;
+  const key=levelProgressKey(lastSessionConfig.level,lastSessionConfig.topic);
+  const progress=getLevelProgress(), old=progress[key]||{};
+  progress[key]={pct:Math.max(Number(old.pct||0),pct),passed:!!old.passed || pct>=60,date:new Date().toISOString()};
+  storageSet(KEY_LEVEL_PROGRESS,JSON.stringify(progress));
 }
 function getTopicScores() {
   try { return JSON.parse(storageGet(KEY_TOPIC_SCORES) || '{}'); } catch(e) { return {}; }
@@ -1445,6 +1515,7 @@ function goHome() {
   updateCircularDashboard();
   renderResumeBanner();
   renderTopics();
+  renderFinalLevels();
 }
 
 function buildNavDots() {
@@ -1580,6 +1651,7 @@ function finishQuiz() {
   const pct = Math.round((ok / total) * 100);
   const grade = gradeForPercent(pct); storageSet(KEY_LAST_GRADE, JSON.stringify({pct, grade}));
   saveTopicScoreFromSession();
+  saveLevelResultIfNeeded(pct);
   saveTestHistory({title:document.getElementById('quizTitle').textContent, pct, grade, total, correct:ok, wrong:err});
   document.getElementById('quizView').classList.add('hidden');
   document.getElementById('resultView').classList.remove('hidden');
@@ -1623,6 +1695,7 @@ loadUiPrefs();
 updateGlobalDashboard();
 renderResumeBanner();
 renderTopics();
+renderFinalLevels();
 updateCircularDashboard();
 </script>
 <script>
