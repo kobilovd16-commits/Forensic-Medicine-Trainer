@@ -500,6 +500,15 @@
   .level-topic:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
   .level-topic.done{background:var(--green-bg);border-color:var(--green);color:#168258}
   .level-topic:disabled{cursor:not-allowed;opacity:.55}
+  .cycle-progress-track{height:7px;background:#e7f1f0;border-radius:99px;overflow:hidden;margin-top:10px}
+  .cycle-progress-fill{height:100%;background:linear-gradient(90deg,#0f8b8d,#22a06b);border-radius:99px;transition:width .25s}
+  .cycle-topic-score{display:block;font-size:12px;margin-top:4px}
+  .cycle-topic-status{display:block;font-size:10px;font-weight:700;color:var(--text-muted);margin-top:3px}
+  .cycle-topic-progress{display:block;height:4px;background:#e5eeee;border-radius:99px;overflow:hidden;margin-top:6px}
+  .cycle-topic-progress i{display:block;height:100%;background:var(--primary);border-radius:99px}
+  .level-topic.done .cycle-topic-status{color:#168258}
+  .keyboard-hint{font-size:12px;color:var(--text-muted);text-align:center;margin:10px 0 18px}
+  .keyboard-hint kbd{display:inline-block;background:#f1f7f7;border:1px solid #dcebea;border-bottom-width:2px;border-radius:5px;padding:1px 5px;margin:0 2px;color:var(--text);font:600 11px inherit}
   @media(max-width:760px){.level-topics{grid-template-columns:repeat(3,1fr)}.levels-heading{flex-direction:column}.level-rule{white-space:normal}}
 
 </style>
@@ -631,8 +640,8 @@
     <section class="levels-panel">
       <div class="levels-heading">
         <div>
-          <div class="dashboard-title">Финальные уровни</div>
-          <div class="dashboard-sub">4 круга повторения: каждый уровень содержит общий тест по всем 9 темам.</div>
+          <div class="dashboard-title">Циклы подготовки</div>
+          <div class="dashboard-sub">4 цикла по 9 общих тестов. Внутри каждого цикла темы открываются по порядку — от 1 до 9.</div>
         </div>
         <span class="level-rule">Проходной балл: 60%</span>
       </div>
@@ -670,6 +679,7 @@
       <button class="btn-nav" id="prevBtn" onclick="prevQuestion()">← Назад</button>
       <button class="btn-next" id="nextBtn" onclick="nextQuestion()">Следующий →</button>
     </div>
+    <div class="keyboard-hint">Клавиатура: <kbd>1–9</kbd> выбрать вариант • <kbd>Space</kbd> или <kbd>Shift</kbd> следующий вопрос</div>
   </section>
 
   <!-- RESULT VIEW -->
@@ -959,43 +969,69 @@ function getLevelProgress() {
   try { return JSON.parse(storageGet(KEY_LEVEL_PROGRESS) || '{}'); } catch(e) { return {}; }
 }
 function levelProgressKey(level, topic) { return level + '_' + topic; }
+function hasCycleTopicPassed(level, topic) {
+  const item = getLevelProgress()[levelProgressKey(level, topic)];
+  return !!(item && (item.everPassed || item.passed));
+}
 function isLevelUnlocked(level) {
   if (level === 1) return true;
-  const progress = getLevelProgress();
   for (let topic=1; topic<=9; topic++) {
-    if (!progress[levelProgressKey(level-1, topic)]?.passed) return false;
+    if (!hasCycleTopicPassed(level-1, topic)) return false;
   }
   return true;
+}
+function isLevelTopicUnlocked(level, topic) {
+  if (!isLevelUnlocked(level)) return false;
+  if (topic === 1) return true;
+  return hasCycleTopicPassed(level, topic-1);
 }
 function renderFinalLevels() {
   const el=document.getElementById('levelsContainer'); if(!el) return;
   const progress=getLevelProgress();
   el.innerHTML=Array.from({length:4},(_,idx)=>{
     const level=idx+1, unlocked=isLevelUnlocked(level);
-    const done=Array.from({length:9},(_,i)=>progress[levelProgressKey(level,i+1)]?.passed).filter(Boolean).length;
+    const done=Array.from({length:9},(_,i)=>progress[levelProgressKey(level,i+1)] && (progress[levelProgressKey(level,i+1)].everPassed || progress[levelProgressKey(level,i+1)].passed)).filter(Boolean).length;
+    const cyclePct=Math.round(done/9*100);
     const cards=Array.from({length:9},(_,i)=>{
       const topic=i+1, item=progress[levelProgressKey(level,topic)], passed=!!item?.passed;
-      const score=item?.pct==null?'—':item.pct+'%';
-      return '<button class="level-topic '+(passed?'done':'')+'" '+(!unlocked?'disabled':'')+' onclick="startLevelTopicTest('+level+','+topic+')">Тема '+topic+'<br><span>'+score+(passed?' ✓':'')+'</span></button>';
+      const topicUnlocked=isLevelTopicUnlocked(level,topic);
+      const pct=item?.pct==null?0:Number(item.pct);
+      const score=item?.pct==null?'Нет результата':pct+'%';
+      const correct=item?.correct==null?'—':item.correct;
+      const total=item?.total==null?'—':item.total;
+      const status=passed?'Пройден':(item?'Не пройден':'Не начат');
+      return '<button class="level-topic '+(passed?'done':'')+'" '+(!topicUnlocked?'disabled':'')+' title="'+(topicUnlocked?'Открыть тест темы '+topic:'Сначала пройдите предыдущий тест с результатом не менее 60%')+'" onclick="startLevelTopicTest('+level+','+topic+')">Тема '+topic+'<span class="cycle-topic-score">'+score+'</span><span class="cycle-topic-status">'+status+' • '+correct+'/'+total+'</span><span class="cycle-topic-progress"><i style="width:'+pct+'%"></i></span></button>';
     }).join('');
-    return '<div class="level-card '+(!unlocked?'locked':'')+'"><div class="level-card-head"><div class="level-title">Уровень '+level+'</div><div class="level-status">'+(unlocked?(done+'/9 тестов пройдено'):'🔒 Сначала завершите уровень '+(level-1))+'</div></div><div class="level-topics">'+cards+'</div></div>';
+    const statusText=!unlocked?'🔒 Завершите предыдущий цикл':(done===9?'Все 9 тестов зачтены':done+'/9 тестов зачтено');
+    return '<div class="level-card '+(!unlocked?'locked':'')+'"><div class="level-card-head"><div class="level-title">Цикл '+level+'</div><div class="level-status">'+statusText+'</div></div><div class="cycle-progress-track"><div class="cycle-progress-fill" style="width:'+cyclePct+'%"></div></div><div class="level-topics">'+cards+'</div></div>';
   }).join('');
 }
 function startLevelTopicTest(level, topic) {
-  if (!isLevelUnlocked(level)) {
-    alert('Сначала пройдите все 9 тестов предыдущего уровня с результатом не менее 60%.');
+  if (!isLevelTopicUnlocked(level, topic)) {
+    alert('Соблюдай порядок: сначала пройди предыдущую тему этого цикла. Для перехода дальше нужен результат не менее 60%.');
     return;
   }
   const pool=ALL_QUESTIONS.filter(item=>item.topic===topic);
   if(!pool.length){ alert('В этой теме пока нет вопросов.'); return; }
   lastSessionConfig={type:'levelTopic',level,topic};
-  launchSession('Уровень '+level+' • Итоговый тест темы '+topic+' ('+pool.length+' вопросов)', shuffleArray(pool), false, false, 'test', true);
+  launchSession('Цикл '+level+' • Тема '+topic+' • Общий тест ('+pool.length+' вопросов)', shuffleArray(pool), false, false, 'test', true);
 }
-function saveLevelResultIfNeeded(pct) {
+function saveLevelResultIfNeeded(pct, correct, total, wrong) {
   if(!lastSessionConfig || lastSessionConfig.type!=='levelTopic') return;
   const key=levelProgressKey(lastSessionConfig.level,lastSessionConfig.topic);
   const progress=getLevelProgress(), old=progress[key]||{};
-  progress[key]={pct:Math.max(Number(old.pct||0),pct),passed:!!old.passed || pct>=60,date:new Date().toISOString()};
+  const passed=pct>=60;
+  progress[key]={
+    pct:pct,
+    correct:correct,
+    total:total,
+    wrong:wrong,
+    passed:passed,
+    everPassed:!!old.everPassed || !!old.passed || passed,
+    bestPct:Math.max(Number(old.bestPct||old.pct||0),pct),
+    attempts:Number(old.attempts||0)+1,
+    completedAt:new Date().toISOString()
+  };
   storageSet(KEY_LEVEL_PROGRESS,JSON.stringify(progress));
 }
 function getTopicScores() {
@@ -1466,6 +1502,7 @@ function restartCurrentMode() {
   else if (c.type === 'subtopic') startSubtopic(c.tNum, c.part, c.kind);
   else if (c.type === 'subtopicStudy') startStudySubtopic(c.tNum, c.part);
   else if (c.type === 'deanTest') startDeanTest(c.limit, c.withTimer);
+  else if (c.type === 'levelTopic') startLevelTopicTest(c.level, c.topic);
 }
 
 function retrySessionMistakes() {
@@ -1653,7 +1690,8 @@ function finishQuiz() {
   const pct = Math.round((ok / total) * 100);
   const grade = gradeForPercent(pct); storageSet(KEY_LAST_GRADE, JSON.stringify({pct, grade}));
   saveTopicScoreFromSession();
-  saveLevelResultIfNeeded(pct);
+  saveLevelResultIfNeeded(pct, ok, total, err);
+  renderFinalLevels();
   saveTestHistory({title:document.getElementById('quizTitle').textContent, pct, grade, total, correct:ok, wrong:err});
   document.getElementById('quizView').classList.add('hidden');
   document.getElementById('resultView').classList.remove('hidden');
@@ -1690,6 +1728,39 @@ function finishQuiz() {
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// Keyboard controls for quiz mode. Numpad codes work with NumLock on or off.
+document.addEventListener('keydown', function(event) {
+  const quiz = document.getElementById('quizView');
+  if (!quiz || quiz.classList.contains('hidden')) return;
+  if (event.ctrlKey || event.altKey || event.metaKey) return;
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable || active.tagName === 'SELECT')) return;
+
+  if (event.code === 'Space' || event.key === ' ') {
+    event.preventDefault();
+    if (!event.repeat) nextQuestion();
+    return;
+  }
+  if (event.key === 'Shift' && !event.repeat) {
+    event.preventDefault();
+    nextQuestion();
+    return;
+  }
+  if (event.shiftKey) return;
+
+  let number = null;
+  const match = String(event.code || '').match(/^(?:Digit|Numpad)([1-9])$/);
+  if (match) number = Number(match[1]);
+  else if (/^[1-9]$/.test(event.key)) number = Number(event.key);
+  if (number === null) return;
+
+  const optionIndex = number - 1;
+  const current = sessionQuestions[currentIndex];
+  if (!current || optionIndex >= current.o.length || sessionAnswers[currentIndex] !== undefined) return;
+  event.preventDefault();
+  selectOption(optionIndex);
+});
 
 checkStorageAvailability();
 initTheme();
