@@ -496,7 +496,7 @@
       <div class="brand-badge">СМЭ</div>
       <div>
         <div class="brand-title">Судебная медицина</div>
-        <div class="brand-sub" id="storageStatus">Автосохранение активно • 777 вопросов</div>
+        <div class="brand-sub" id="storageStatus">Автосохранение активно • 772 вопросов</div>
       </div>
     </div>
     <div class="top-actions">
@@ -513,7 +513,7 @@
     <!-- GLOBAL PROGRESS -->
     <section class="global-stats">
       <div class="stat-box">
-        <div class="stat-val" id="gSolved">0 / 777</div>
+        <div class="stat-val" id="gSolved">0 / 772</div>
         <div class="stat-lbl">Всего прорешано</div>
       </div>
       <div class="stat-box">
@@ -566,7 +566,7 @@
     <!-- EXAM BANNER -->
     <section class="exam-banner dean-banner">
       <h1>Деканатский мини-тест</h1>
-      <p>Все 777 вопросов из девяти тем вперемешку. Выбери количество вопросов и режим прохождения.</p>
+      <p>Вопросы из девяти тем вперемешку. Выбери количество вопросов и режим прохождения.</p>
       <div class="dean-choice">
         <div class="dean-choice-title">1. Количество вопросов</div>
         <div class="exam-controls">
@@ -679,19 +679,68 @@ const TOPIC_TITLES = {
 };
 
 const ALL_QUESTIONS = [];
+const normalizeQuestionText = value => String(value || '').toLowerCase().replace(/[^а-яёa-z0-9]/gi, '');
+const t6SituationalTexts = new Set((DB.find(d => d.id === 't6_s')?.questions || []).map(q => normalizeQuestionText(q.q)));
 DB.forEach(deck => {
   deck.questions.forEach((q, idx) => {
+    // В старом банке 9 ситуационных задач по механическим повреждениям ошибочно
+    // находились в теме 5; пять из них дублировали вопросы темы 6.
+    if (deck.id === 't5_s' && t6SituationalTexts.has(normalizeQuestionText(q.q))) return;
+    const movedFromTopic5 = deck.id === 't5_s';
     ALL_QUESTIONS.push({
       uid: deck.id + "_" + idx,
       q: q.q,
       o: q.o,
-      s: q.s,
-      topic: deck.topic,
+      s: movedFromTopic5 ? 'Тема 6 • Ситуационные' : q.s,
+      topic: movedFromTopic5 ? 6 : deck.topic,
       kind: deck.kind,
       deckId: deck.id
     });
   });
 });
+
+const SUBTOPIC_INFO = {
+  5: [
+    { title: 'Общая токсикология, алкоголь и наркотические вещества', short: 'Общая токсикология и психоактивные вещества' },
+    { title: 'Отравления ядами и судебно-химические исследования', short: 'Отравления и судебно-химическая диагностика' },
+    { title: 'Термическая травма, перегревание и переохлаждение', short: 'Высокая и низкая температура' }
+  ],
+  6: [
+    { title: 'Повреждения тупыми предметами', short: 'Ссадины, кровоподтёки, ушибы и переломы' },
+    { title: 'Повреждения острыми предметами', short: 'Резаные, колотые, колото-резаные и рубленые раны' },
+    { title: 'Общие вопросы механической травмы', short: 'Механизм, давность, обстоятельства и оценка повреждений' }
+  ]
+};
+
+function getSubtopicForQuestion(item) {
+  const question = String(item.q || '');
+  const correct = (item.o || []).filter(option => option.c).map(option => option.t).join(' ');
+  const thermal = /ожог|термич|температур|переохлаж|гипотерм|отморож|охлажден|перегрев|обуглен|обгора|пятн.{0,12}вишнев|обвар|плам|нагреван|холодов/i;
+  const alcohol = /алкогол|этилов.{0,12}спирт|метилов.{0,12}спирт|опьянен|наркот|морфин|кокаин|токсикоман|барбитур|транквилиз|стрептомицин/i;
+  const sharp = /колот|колющ|колюще|режущ|резан|рубящ|рублен|лезви|клин|нож|стекл|пилящ|остр.{0,12}оруди|двумя лезв|одним лезв|бритв|топор/i;
+  const blunt = /туп|ушиб|ссад|кровоподт|перелом|паден|сдавлен|кулак|вывих|размоз|цилиндрическ|сферическ|плоск.{0,12}поверх|рван.{0,12}ран|удар.{0,12}предмет/i;
+
+  if (item.topic === 5) {
+    if (thermal.test(question)) return 3;
+    if (alcohol.test(question)) return 1;
+    return 2;
+  }
+  if (item.topic === 6) {
+    // Для ситуационных задач ориентируемся прежде всего на правильный ответ,
+    // а затем на условие задачи: в вариантах-отвлекающих ответах встречаются оба типа предметов.
+    if (item.kind === 'situational') {
+      if (blunt.test(correct)) return 1;
+      if (sharp.test(correct)) return 2;
+      if (sharp.test(question)) return 2;
+      if (blunt.test(question)) return 1;
+      return 3;
+    }
+    if (sharp.test(question)) return 2;
+    if (blunt.test(question)) return 1;
+    return 3;
+  }
+  return null;
+}
 
 // Fallback memory store if browser blocks localStorage on file://
 const FALLBACK_STORE = {};
@@ -727,9 +776,9 @@ function checkStorageAvailability() {
     const testKey = '__sme_test__';
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
-    if (statusEl) statusEl.textContent = 'Автосохранение в браузере активно • 777 вопросов';
+    if (statusEl) statusEl.textContent = `Автосохранение в браузере активно • ${ALL_QUESTIONS.length} вопросов`;
   } catch (e) {
-    if (statusEl) statusEl.textContent = 'Режим сессии (localStorage заблокирован) • 777 вопросов';
+    if (statusEl) statusEl.textContent = `Режим сессии (localStorage заблокирован) • ${ALL_QUESTIONS.length} вопросов`;
   }
 }
 
@@ -822,8 +871,28 @@ function importProgressJson(event) {
 
 // Map uid -> 1 (correct) or 0 (wrong)
 function getProgressMap() {
-  try { return JSON.parse(storageGet(KEY_PROGRESS) || '{}'); }
-  catch (e) { return {}; }
+  try {
+    const map = JSON.parse(storageGet(KEY_PROGRESS) || '{}');
+    // Переносим историю пяти повторявшихся задач из ошибочно подписанного набора темы 5
+    // на соответствующие UID темы 6, не теряя ранее сохранённые ответы.
+    const legacyAliases = {
+      't5_s_2': 't6_s_1',
+      't5_s_3': 't6_s_0',
+      't5_s_5': 't6_s_4',
+      't5_s_6': 't6_s_2',
+      't5_s_7': 't6_s_5'
+    };
+    let changed = false;
+    Object.entries(legacyAliases).forEach(([oldUid, newUid]) => {
+      if (map[oldUid] !== undefined) {
+        if (map[newUid] === undefined) map[newUid] = map[oldUid];
+        delete map[oldUid];
+        changed = true;
+      }
+    });
+    if (changed) storageSet(KEY_PROGRESS, JSON.stringify(map));
+    return map;
+  } catch (e) { return {}; }
 }
 const KEY_LAST_GRADE = 'sme_last_grade_v1';
 const KEY_TEST_HISTORY = 'sme_test_history_v1';
@@ -914,7 +983,7 @@ function recordQuestionProgress(uid, isCorrect) {
   updateCircularDashboard();
 }
 function resetAllProgress() {
-  if (!confirm('Сбросить весь сохранённый прогресс по всем 777 вопросам?')) return;
+  if (!confirm(`Сбросить весь сохранённый прогресс по всем ${ALL_QUESTIONS.length} вопросам?`)) return;
   storageRemove(KEY_PROGRESS);
   storageRemove(KEY_ACTIVE_SESSION);
   storageRemove(KEY_TEST_HISTORY);
@@ -1112,12 +1181,70 @@ function getDeckProgressStats(deckId, totalLen) {
   return { solved, ok, unsolved: totalLen - solved };
 }
 
+function renderSplitTopic(container, tNum) {
+  const all = ALL_QUESTIONS.filter(item => item.topic === tNum);
+  const map = getProgressMap();
+  const solved = all.filter(item => map[item.uid] !== undefined).length;
+  const pct = all.length ? Math.round(solved / all.length * 100) : 0;
+  const section = document.createElement('div');
+  section.className = 'topic-section';
+  section.innerHTML = `
+    <div class="topic-sec-header">
+      <div style="flex:1;min-width:220px">
+        <div><span class="topic-num-badge">ТЕМА ${tNum}</span><h2 class="topic-sec-title">${TOPIC_TITLES[tNum]}</h2></div>
+        <div class="deck-stat" style="margin-top:5px">Прогресс темы: ${solved} из ${all.length} (${pct}%)</div>
+        <div class="topic-progress-bar"><div class="topic-progress-fill" style="width:${pct}%"></div></div>
+      </div>
+    </div>
+    <div class="sub-deck" style="margin-bottom:14px">
+      <div class="sub-deck-top"><span class="badge" style="background:var(--primary-soft);color:var(--primary)">Общий тест темы ${tNum}</span><span class="deck-count">${all.length} вопросов</span></div>
+      <div class="deck-stat">Все подразделы вперемешку. Порядок вопросов и варианты ответов перемешиваются.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-start" onclick="startTopicMixed(${tNum})">Начать общий тест</button>
+        <button class="btn-unsolved" onclick="startStudyTopic(${tNum})">Учить всю тему</button>
+      </div>
+    </div>
+    <div class="split-grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr))"></div>`;
+  const grid = section.querySelector('.split-grid');
+  for (let part = 1; part <= 3; part++) {
+    const pool = all.filter(item => getSubtopicForQuestion(item) === part);
+    const sit = pool.filter(item => item.kind === 'situational');
+    const tests = pool.filter(item => item.kind === 'test');
+    const partSolved = pool.filter(item => map[item.uid] !== undefined).length;
+    const partPct = pool.length ? Math.round(partSolved / pool.length * 100) : 0;
+    const info = SUBTOPIC_INFO[tNum][part - 1];
+    const card = document.createElement('div');
+    card.className = 'sub-deck';
+    card.innerHTML = `
+      <div class="sub-deck-top"><span class="badge" style="background:var(--primary-soft);color:var(--primary)">${tNum}.${part}</span><span class="deck-count">${pool.length} вопросов</span></div>
+      <div style="font-weight:750;margin:5px 0 3px">${info.title}</div>
+      <div class="deck-stat">${info.short}</div>
+      <div class="deck-stat" style="margin-top:5px">Прогресс: ${partSolved}/${pool.length} (${partPct}%)</div>
+      <div class="topic-progress-bar"><div class="topic-progress-fill" style="width:${partPct}%"></div></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn-unsolved" onclick="startStudySubtopic(${tNum},${part})">Учить</button>
+        <button class="btn-start" onclick="startSubtopic(${tNum},${part},'mixed')">Тест подраздела</button>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
+        ${sit.length ? `<button class="btn-start sit-btn" onclick="startSubtopic(${tNum},${part},'situational')">Ситуационные (${sit.length})</button>` : ''}
+        ${tests.length ? `<button class="btn-start test-btn" onclick="startSubtopic(${tNum},${part},'test')">Обычные тесты (${tests.length})</button>` : ''}
+      </div>
+      ${!sit.length ? '<div class="deck-stat" style="margin-top:7px">Ситуационных задач в этом подразделе нет в исходном банке.</div>' : ''}`;
+    grid.appendChild(card);
+  }
+  container.appendChild(section);
+}
+
 function renderTopics() {
   const container = document.getElementById('topicsContainer');
   container.innerHTML = '';
   const topicsToShow = selectedTopic === 0 ? [1,2,3,4,5,6,7,8,9] : [selectedTopic];
 
   topicsToShow.forEach(tNum => {
+    if (tNum === 5 || tNum === 6) {
+      renderSplitTopic(container, tNum);
+      return;
+    }
     const sitDeck = DB.find(d => d.topic === tNum && d.kind === 'situational');
     const testDeck = DB.find(d => d.topic === tNum && d.kind === 'test');
     if (!sitDeck || !testDeck) return;
@@ -1159,10 +1286,33 @@ function renderTopics() {
   });
 }
 
+function startSubtopic(tNum, part, kind) {
+  const pool = ALL_QUESTIONS.filter(item => item.topic === tNum && getSubtopicForQuestion(item) === part && (kind === 'mixed' || item.kind === kind));
+  if (!pool.length) {
+    alert('В этом подразделе нет вопросов выбранного типа.');
+    return;
+  }
+  const labels = { mixed: 'Смешанный тест', situational: 'Ситуационные задачи', test: 'Обычные тесты' };
+  lastSessionConfig = { type: 'subtopic', tNum, part, kind };
+  const ordered = document.getElementById('shuffleQuestions').checked ? shuffleArray(pool) : pool;
+  launchSession(`Тема ${tNum}.${part} • ${labels[kind]} (${pool.length})`, ordered, false, false, 'test', true);
+}
+
+function startStudySubtopic(tNum, part) {
+  const pool = ALL_QUESTIONS.filter(item => item.topic === tNum && getSubtopicForQuestion(item) === part);
+  if (!pool.length) {
+    alert('В этом подразделе пока нет вопросов.');
+    return;
+  }
+  lastSessionConfig = { type: 'subtopicStudy', tNum, part };
+  launchSession(`Изучение темы ${tNum}.${part} (${pool.length})`, shuffleArray(pool), false, false, 'study', true);
+}
+
 function startTopicMixed(tNum) {
   const pool = ALL_QUESTIONS.filter(item => item.topic === tNum);
   lastSessionConfig = { type: 'topicMixed', tNum };
-  launchSession(`Тема ${tNum} • Перемешка (${pool.length})`, shuffleArray(pool), false, false, 'test');
+  const ordered = document.getElementById('shuffleQuestions').checked ? shuffleArray(pool) : pool;
+  launchSession(`Тема ${tNum} • Общий тест (${pool.length})`, ordered, false, false, 'test', true);
 }
 
 function startDeanTest(limit, withTimer) {
@@ -1174,14 +1324,14 @@ function startDeanTest(limit, withTimer) {
 function startRandomAll(limit) {
   lastSessionConfig = { type: 'randomAll', limit };
   const subset = shuffleArray(ALL_QUESTIONS).slice(0, Math.min(limit, ALL_QUESTIONS.length));
-  launchSession(`Случайные ${subset.length} из 777`, subset);
+  launchSession(`Случайные ${subset.length} из ${ALL_QUESTIONS.length}`, subset);
 }
 
 function startUnsolvedAll() {
   const map = getProgressMap();
   const pool = ALL_QUESTIONS.filter(q => map[q.uid] === undefined);
   if (pool.length === 0) {
-    alert('Ты уже прорешал все 777 вопросов! Можешь сделать сброс или пройти раздел «Ошибки».');
+    alert('Ты уже прорешал все вопросы! Можешь сделать сброс или пройти раздел «Ошибки».');
     return;
   }
   lastSessionConfig = { type: 'unsolvedAll' };
@@ -1241,6 +1391,8 @@ function restartCurrentMode() {
   else if (c.type === 'deck') startDeck(c.deckId, c.onlyUnsolved);
   else if (c.type === 'mistakes') startMistakesQuiz();
   else if (c.type === 'topicMixed') startTopicMixed(c.tNum);
+  else if (c.type === 'subtopic') startSubtopic(c.tNum, c.part, c.kind);
+  else if (c.type === 'subtopicStudy') startStudySubtopic(c.tNum, c.part);
   else if (c.type === 'deanTest') startDeanTest(c.limit, c.withTimer);
 }
 
@@ -1253,7 +1405,7 @@ function retrySessionMistakes() {
   launchSession(`Ошибки сессии (${wrongPool.length})`, shuffleArray(wrongPool));
 }
 
-function launchSession(title, rawPool, isAssessment = false, withTimer = false, mode = 'test') {
+function launchSession(title, rawPool, isAssessment = false, withTimer = false, mode = 'test', forceShuffleOptions = false) {
   stopQuizTimer();
   assessmentMode = !!isAssessment;
   timedMode = !!withTimer;
@@ -1263,7 +1415,7 @@ function launchSession(title, rawPool, isAssessment = false, withTimer = false, 
   timerWarning5Shown = false;
   timerWarning1Shown = false;
 
-  const shuffleOpts = document.getElementById('shuffleOptions').checked;
+  const shuffleOpts = forceShuffleOptions || document.getElementById('shuffleOptions').checked;
   sessionQuestions = rawPool.map(item => ({
     uid: item.uid, q: item.q, s: item.s, topic: item.topic || null,
     o: shuffleOpts ? shuffleArray(item.o) : item.o.slice()
